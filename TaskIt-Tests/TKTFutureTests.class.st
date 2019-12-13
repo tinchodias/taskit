@@ -1,7 +1,7 @@
 Class {
 	#name : #TKTFutureTests,
 	#superclass : #TKTTestCase,
-	#category : 'TaskIt-Tests-Futures'
+	#category : #'TaskIt-Tests-Futures'
 }
 
 { #category : #initialization }
@@ -26,6 +26,44 @@ TKTFutureTests >> testCannotDeployTwiceIntoFuture [
 	future := TKTFuture new.
 	future deploySuccess: 2.
 	self should: [future deploySuccess: 3] raise: Error.
+]
+
+{ #category : #'tests-combinators' }
+TKTFutureTests >> testCombinedSuccessCallbackExecutesAfterAllFuturesSucceed [
+
+	| interval futures got |
+	interval := 1 to: 3.
+	futures := interval collect: [ :each | TKTFuture of: each ].
+
+	(TKTFuture fromCollectionOfFutures: futures) onSuccessDo: [ :tuple | got := tuple ].
+	50 milliSeconds wait.
+
+	self assert: got equals: interval asOrderedCollection
+]
+
+{ #category : #'tests-combinators' }
+TKTFutureTests >> testCombinedSuccessCallbackExecutesAfterOnlySomeFuturesSucceed [
+
+	| interval futures got1 got2 |
+	interval := 1 to: 5.
+	futures := interval collect: [ :index | 
+		| future |
+		future := TKTFuture new.
+		index even
+			ifTrue: [ future deploySuccess: index ]
+			ifFalse: [
+				[ Error signal: index asString ]
+					on: Error
+					do: [ :e | future deployFailure: e ] ]
+		].
+
+	(TKTFuture fromCollectionOfFutures: futures)
+		onSuccessDo: [ :tuple | got1 := tuple ];
+		onFailureDo: [ :tuple | got2 := tuple ].
+	50 milliSeconds wait.
+
+	self assert: got1 equals: nil.
+	self assert: got2 equals: interval asOrderedCollection
 ]
 
 { #category : #'tests-combinators' }
